@@ -21,8 +21,7 @@ from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Dash, Input, Output, State, dcc, html, dash_table
-
+from dash import Dash, Input, Output, State, dash_table, dcc, html
 
 # -----------------------------
 # Constants and brand colors
@@ -45,6 +44,7 @@ FT3_PER_ACFT = 43560.0
 # -----------------------------
 # Data classes
 # -----------------------------
+
 
 @dataclass
 class CrossSection:
@@ -86,6 +86,7 @@ class RoutingResult:
 # -----------------------------
 # Helper utilities
 # -----------------------------
+
 
 def normalize_name(name: str) -> str:
     name = str(name).strip().lower()
@@ -150,6 +151,7 @@ def safe_divide(a: np.ndarray, b: np.ndarray, fill: float = 0.0) -> np.ndarray:
 # Sample data
 # -----------------------------
 
+
 def make_sample_hydrograph() -> pd.DataFrame:
     time = np.arange(0, 13 * 60 + 5, 5, dtype=float)
     q_base = 35.0
@@ -207,7 +209,10 @@ PREDEFINED_REACHES: Dict[str, CrossSection] = {
 # Geometry and hydraulics
 # -----------------------------
 
-def scaled_cross_section(xs: CrossSection, overbank_width_factor: float, overbank_elev_adjust_ft: float) -> CrossSection:
+
+def scaled_cross_section(
+    xs: CrossSection, overbank_width_factor: float, overbank_elev_adjust_ft: float
+) -> CrossSection:
     station = xs.station_ft.copy()
     elev = xs.elevation_ft.copy()
     lob = xs.left_overbank_station_ft
@@ -289,7 +294,7 @@ def wetted_properties_at_elevation(
 
         ground_dx = np.diff(sub_station)
         ground_dz = np.diff(sub_ground)
-        perimeter = float(np.sum(np.sqrt(ground_dx ** 2 + ground_dz ** 2)))
+        perimeter = float(np.sum(np.sqrt(ground_dx**2 + ground_dz**2)))
         if perimeter <= 0.0:
             continue
 
@@ -361,6 +366,7 @@ def build_rating_table(
 # Routing models
 # -----------------------------
 
+
 def lag_hydrograph(time_min: np.ndarray, inflow: np.ndarray, lag_min: float) -> np.ndarray:
     source_time = time_min - lag_min
     return np.interp(source_time, time_min, inflow, left=inflow[0], right=inflow[-1])
@@ -401,10 +407,8 @@ def route_variable_muskingum_cunge(
         trial_q = max(0.5 * (inflow_cfs[i - 1] + inflow_cfs[i]), 1.0)
         trial_q = min(trial_q, max_rating_q)
 
-        stage_i = float(np.interp(trial_q, q_rating, rating.stage_ft))
         area_i = float(np.interp(trial_q, q_rating, rating.area_sqft))
         width_i = float(np.interp(trial_q, q_rating, rating.top_width_ft))
-        storage_i = float(np.interp(trial_q, q_rating, rating.storage_acft))
 
         velocity = trial_q / max(area_i, 1.0)
         wave_celerity = max(1.2 * velocity, 0.25)
@@ -483,6 +487,7 @@ def run_model(
 # Summaries and plots
 # -----------------------------
 
+
 def summarize_results(result: RoutingResult, target_peak_cfs: float, target_peak_time_min: float) -> pd.DataFrame:
     inflow_peak, inflow_time = peak_stats(result.time_min, result.inflow_cfs)
     lag_peak, lag_time = peak_stats(result.time_min, result.pure_lag_cfs)
@@ -494,20 +499,60 @@ def summarize_results(result: RoutingResult, target_peak_cfs: float, target_peak
     rows = [
         ["Inflow", inflow_peak, inflow_time, "--", "--"],
         ["Pure Lag", lag_peak, lag_time, lag_peak - target_peak_cfs, lag_time - target_peak_time_min],
-        ["Muskingum-Cunge-style", routed_peak, routed_time, routed_peak - target_peak_cfs, routed_time - target_peak_time_min],
+        [
+            "Muskingum-Cunge-style",
+            routed_peak,
+            routed_time,
+            routed_peak - target_peak_cfs,
+            routed_time - target_peak_time_min,
+        ],
         ["Volume In (ac-ft)", volume_in, "--", "--", "--"],
         ["Volume Out (ac-ft)", volume_out, "--", volume_out - volume_in, "--"],
-        ["Max Stage (ft)", float(np.max(result.stage_ft)), float(result.time_min[int(np.argmax(result.stage_ft))]), "--", "--"],
+        [
+            "Max Stage (ft)",
+            float(np.max(result.stage_ft)),
+            float(result.time_min[int(np.argmax(result.stage_ft))]),
+            "--",
+            "--",
+        ],
     ]
     return pd.DataFrame(rows, columns=["Metric", "Value", "Time (min)", "Peak Error", "Timing Error (min)"])
 
 
 def make_hydrograph_figure(result: RoutingResult, target_peak_cfs: float, target_peak_time_min: float) -> go.Figure:
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=result.time_min, y=result.inflow_cfs, mode="lines", name="Inflow", line={"color": FNI_BLUE, "width": 3}))
-    fig.add_trace(go.Scatter(x=result.time_min, y=result.pure_lag_cfs, mode="lines", name="Pure Lag", line={"color": FNI_AQUA, "width": 3, "dash": "dash"}))
-    fig.add_trace(go.Scatter(x=result.time_min, y=result.routed_cfs, mode="lines", name="Muskingum-Cunge-style Routed", line={"color": FNI_GREEN, "width": 3}))
-    fig.add_trace(go.Scatter(x=[target_peak_time_min], y=[target_peak_cfs], mode="markers", name="Target Peak", marker={"color": FNI_ORANGE, "size": 13, "symbol": "x"}))
+    fig.add_trace(
+        go.Scatter(
+            x=result.time_min, y=result.inflow_cfs, mode="lines", name="Inflow", line={"color": FNI_BLUE, "width": 3}
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=result.time_min,
+            y=result.pure_lag_cfs,
+            mode="lines",
+            name="Pure Lag",
+            line={"color": FNI_AQUA, "width": 3, "dash": "dash"},
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=result.time_min,
+            y=result.routed_cfs,
+            mode="lines",
+            name="Muskingum-Cunge-style Routed",
+            line={"color": FNI_GREEN, "width": 3},
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[target_peak_time_min],
+            y=[target_peak_cfs],
+            mode="markers",
+            name="Target Peak",
+            marker={"color": FNI_ORANGE, "size": 13, "symbol": "x"},
+        )
+    )
     fig.update_layout(
         title="Hydrograph Timing and Attenuation",
         xaxis_title="Time (minutes)",
@@ -523,8 +568,24 @@ def make_cross_section_figure(xs: CrossSection, rating: RatingTable, stage_to_sh
     min_elev = float(np.min(xs.elevation_ft))
     water_elev = min_elev + stage_to_show
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=xs.station_ft, y=xs.elevation_ft, mode="lines+markers", name="Ground", line={"color": FNI_NAVY, "width": 3}))
-    fig.add_trace(go.Scatter(x=[xs.station_ft.min(), xs.station_ft.max()], y=[water_elev, water_elev], mode="lines", name="Max Routed Water Surface", line={"color": FNI_AQUA, "width": 3, "dash": "dot"}))
+    fig.add_trace(
+        go.Scatter(
+            x=xs.station_ft,
+            y=xs.elevation_ft,
+            mode="lines+markers",
+            name="Ground",
+            line={"color": FNI_NAVY, "width": 3},
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[xs.station_ft.min(), xs.station_ft.max()],
+            y=[water_elev, water_elev],
+            mode="lines",
+            name="Max Routed Water Surface",
+            line={"color": FNI_AQUA, "width": 3, "dash": "dot"},
+        )
+    )
     fig.add_vline(x=xs.left_overbank_station_ft, line_color=GRAY, line_dash="dash")
     fig.add_vline(x=xs.right_overbank_station_ft, line_color=GRAY, line_dash="dash")
     fig.update_layout(
@@ -539,8 +600,25 @@ def make_cross_section_figure(xs: CrossSection, rating: RatingTable, stage_to_sh
 
 def make_rating_figure(rating: RatingTable) -> go.Figure:
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=rating.discharge_cfs, y=rating.stage_ft, mode="lines", name="Stage-Discharge", line={"color": FNI_BLUE, "width": 3}))
-    fig.add_trace(go.Scatter(x=rating.discharge_cfs, y=rating.storage_acft, mode="lines", name="Storage-Discharge", yaxis="y2", line={"color": FNI_GREEN, "width": 3}))
+    fig.add_trace(
+        go.Scatter(
+            x=rating.discharge_cfs,
+            y=rating.stage_ft,
+            mode="lines",
+            name="Stage-Discharge",
+            line={"color": FNI_BLUE, "width": 3},
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=rating.discharge_cfs,
+            y=rating.storage_acft,
+            mode="lines",
+            name="Storage-Discharge",
+            yaxis="y2",
+            line={"color": FNI_GREEN, "width": 3},
+        )
+    )
     fig.update_layout(
         title="Rating and Storage Implied by One Cross Section",
         xaxis_title="Discharge (cfs)",
@@ -555,8 +633,21 @@ def make_rating_figure(rating: RatingTable) -> go.Figure:
 
 def make_parameter_figure(result: RoutingResult) -> go.Figure:
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=result.time_min, y=result.k_hr, mode="lines", name="Estimated K", line={"color": FNI_BLUE, "width": 3}))
-    fig.add_trace(go.Scatter(x=result.time_min, y=result.x, mode="lines", name="Estimated X", yaxis="y2", line={"color": FNI_GREEN, "width": 3}))
+    fig.add_trace(
+        go.Scatter(
+            x=result.time_min, y=result.k_hr, mode="lines", name="Estimated K", line={"color": FNI_BLUE, "width": 3}
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=result.time_min,
+            y=result.x,
+            mode="lines",
+            name="Estimated X",
+            yaxis="y2",
+            line={"color": FNI_GREEN, "width": 3},
+        )
+    )
     fig.update_layout(
         title="Routing Parameters During the Event",
         xaxis_title="Time (minutes)",
@@ -570,11 +661,15 @@ def make_parameter_figure(result: RoutingResult) -> go.Figure:
 
 
 def metric_card(title: str, value: str, subtitle: str) -> html.Div:
-    return html.Div([
-        html.Div(title, style={"fontSize": "14px", "fontWeight": "bold", "color": DARK_GRAY, "marginBottom": "8px"}),
-        html.Div(value, style={"fontSize": "27px", "fontWeight": "bold", "color": FNI_BLUE, "marginBottom": "6px"}),
-        html.Div(subtitle, style={"fontSize": "14px", "color": DARK_GRAY}),
-    ])
+    return html.Div(
+        [
+            html.Div(
+                title, style={"fontSize": "14px", "fontWeight": "bold", "color": DARK_GRAY, "marginBottom": "8px"}
+            ),
+            html.Div(value, style={"fontSize": "27px", "fontWeight": "bold", "color": FNI_BLUE, "marginBottom": "6px"}),
+            html.Div(subtitle, style={"fontSize": "14px", "color": DARK_GRAY}),
+        ]
+    )
 
 
 # -----------------------------
@@ -610,6 +705,18 @@ UPLOAD_STYLE = {
     "color": FNI_NAVY,
 }
 
+DOWNLOAD_BUTTON_STYLE = {
+    "width": "100%",
+    "marginBottom": "14px",
+    "padding": "8px 12px",
+    "borderRadius": "10px",
+    "border": f"1px solid {FNI_BLUE}",
+    "backgroundColor": "#f8fbfc",
+    "color": FNI_BLUE,
+    "fontWeight": "bold",
+    "cursor": "pointer",
+}
+
 SLIDER_MARKS_01 = {0.5: "0.5", 1.0: "1.0", 1.5: "1.5", 2.0: "2.0"}
 
 app.layout = html.Div(
@@ -621,6 +728,7 @@ app.layout = html.Div(
         "color": FNI_NAVY,
     },
     children=[
+        dcc.Download(id="download-hydro-sample"),
         html.Div(
             style={"maxWidth": "1500px", "margin": "0 auto"},
             children=[
@@ -637,8 +745,18 @@ app.layout = html.Div(
                             children=[
                                 html.H3("Inputs", style={"marginTop": 0, "color": FNI_BLUE}),
                                 html.Label("Optional inflow hydrograph CSV", style={"fontWeight": "bold"}),
-                                dcc.Upload(id="upload-hydro", children=html.Div("Drag and drop or click to select"), style=UPLOAD_STYLE, multiple=False),
-                                html.Div(id="hydro-file-name", style={"marginTop": "8px", "marginBottom": "14px"}),
+                                dcc.Upload(
+                                    id="upload-hydro",
+                                    children=html.Div("Drag and drop or click to select"),
+                                    style=UPLOAD_STYLE,
+                                    multiple=False,
+                                ),
+                                html.Div(id="hydro-file-name", style={"marginTop": "8px", "marginBottom": "8px"}),
+                                html.Button(
+                                    "Download sample hydrograph CSV",
+                                    id="btn-download-hydro",
+                                    style=DOWNLOAD_BUTTON_STYLE,
+                                ),
                                 html.Label("Predefined reach", style={"fontWeight": "bold"}),
                                 dcc.Dropdown(
                                     id="reach-select",
@@ -648,26 +766,106 @@ app.layout = html.Div(
                                     style={"marginBottom": "14px"},
                                 ),
                                 html.Label("Target peak flow (cfs)", style={"fontWeight": "bold"}),
-                                dcc.Slider(id="target-peak", min=900, max=2300, step=25, value=1450, marks={1000: "1000", 1500: "1500", 2000: "2000"}, tooltip={"placement": "bottom", "always_visible": True}),
+                                dcc.Slider(
+                                    id="target-peak",
+                                    min=900,
+                                    max=2300,
+                                    step=25,
+                                    value=1450,
+                                    marks={1000: "1000", 1500: "1500", 2000: "2000"},
+                                    tooltip={"placement": "bottom", "always_visible": True},
+                                ),
                                 html.Label("Target peak time (min)", style={"fontWeight": "bold"}),
-                                dcc.Slider(id="target-time", min=300, max=620, step=5, value=450, marks={300: "300", 450: "450", 600: "600"}, tooltip={"placement": "bottom", "always_visible": True}),
+                                dcc.Slider(
+                                    id="target-time",
+                                    min=300,
+                                    max=620,
+                                    step=5,
+                                    value=450,
+                                    marks={300: "300", 450: "450", 600: "600"},
+                                    tooltip={"placement": "bottom", "always_visible": True},
+                                ),
                                 html.H4("Cross-section calibration controls", style={"color": FNI_BLUE}),
                                 html.Label("Overbank width factor", style={"fontWeight": "bold"}),
-                                dcc.Slider(id="overbank-width", min=0.5, max=2.5, step=0.05, value=1.0, marks={0.5: "0.5", 1.0: "1.0", 1.5: "1.5", 2.0: "2.0", 2.5: "2.5"}, tooltip={"placement": "bottom", "always_visible": True}),
+                                dcc.Slider(
+                                    id="overbank-width",
+                                    min=0.5,
+                                    max=2.5,
+                                    step=0.05,
+                                    value=1.0,
+                                    marks={0.5: "0.5", 1.0: "1.0", 1.5: "1.5", 2.0: "2.0", 2.5: "2.5"},
+                                    tooltip={"placement": "bottom", "always_visible": True},
+                                ),
                                 html.Label("Overbank elevation adjustment (ft)", style={"fontWeight": "bold"}),
-                                dcc.Slider(id="overbank-elev", min=-2.0, max=2.0, step=0.1, value=0.0, marks={-2: "-2", 0: "0", 2: "2"}, tooltip={"placement": "bottom", "always_visible": True}),
+                                dcc.Slider(
+                                    id="overbank-elev",
+                                    min=-2.0,
+                                    max=2.0,
+                                    step=0.1,
+                                    value=0.0,
+                                    marks={-2: "-2", 0: "0", 2: "2"},
+                                    tooltip={"placement": "bottom", "always_visible": True},
+                                ),
                                 html.Label("Main channel Manning n", style={"fontWeight": "bold"}),
-                                dcc.Slider(id="n-main", min=0.025, max=0.080, step=0.001, value=0.040, marks={0.03: "0.03", 0.05: "0.05", 0.08: "0.08"}, tooltip={"placement": "bottom", "always_visible": True}),
+                                dcc.Slider(
+                                    id="n-main",
+                                    min=0.025,
+                                    max=0.080,
+                                    step=0.001,
+                                    value=0.040,
+                                    marks={0.03: "0.03", 0.05: "0.05", 0.08: "0.08"},
+                                    tooltip={"placement": "bottom", "always_visible": True},
+                                ),
                                 html.Label("Overbank Manning n", style={"fontWeight": "bold"}),
-                                dcc.Slider(id="n-overbank", min=0.045, max=0.180, step=0.005, value=0.095, marks={0.05: "0.05", 0.10: "0.10", 0.15: "0.15"}, tooltip={"placement": "bottom", "always_visible": True}),
+                                dcc.Slider(
+                                    id="n-overbank",
+                                    min=0.045,
+                                    max=0.180,
+                                    step=0.005,
+                                    value=0.095,
+                                    marks={0.05: "0.05", 0.10: "0.10", 0.15: "0.15"},
+                                    tooltip={"placement": "bottom", "always_visible": True},
+                                ),
                                 html.Label("Reach length factor", style={"fontWeight": "bold"}),
-                                dcc.Slider(id="length-factor", min=0.5, max=2.0, step=0.05, value=1.0, marks=SLIDER_MARKS_01, tooltip={"placement": "bottom", "always_visible": True}),
+                                dcc.Slider(
+                                    id="length-factor",
+                                    min=0.5,
+                                    max=2.0,
+                                    step=0.05,
+                                    value=1.0,
+                                    marks=SLIDER_MARKS_01,
+                                    tooltip={"placement": "bottom", "always_visible": True},
+                                ),
                                 html.Label("Slope factor", style={"fontWeight": "bold"}),
-                                dcc.Slider(id="slope-factor", min=0.5, max=2.0, step=0.05, value=1.0, marks=SLIDER_MARKS_01, tooltip={"placement": "bottom", "always_visible": True}),
+                                dcc.Slider(
+                                    id="slope-factor",
+                                    min=0.5,
+                                    max=2.0,
+                                    step=0.05,
+                                    value=1.0,
+                                    marks=SLIDER_MARKS_01,
+                                    tooltip={"placement": "bottom", "always_visible": True},
+                                ),
                                 html.Label("Muskingum-Cunge X factor", style={"fontWeight": "bold"}),
-                                dcc.Slider(id="x-factor", min=0.5, max=1.5, step=0.05, value=1.0, marks={0.5: "0.5", 1.0: "1.0", 1.5: "1.5"}, tooltip={"placement": "bottom", "always_visible": True}),
+                                dcc.Slider(
+                                    id="x-factor",
+                                    min=0.5,
+                                    max=1.5,
+                                    step=0.05,
+                                    value=1.0,
+                                    marks={0.5: "0.5", 1.0: "1.0", 1.5: "1.5"},
+                                    tooltip={"placement": "bottom", "always_visible": True},
+                                ),
                                 html.Label("Pure lag comparison (min)", style={"fontWeight": "bold"}),
-                                dcc.Slider(id="pure-lag", min=0, max=240, step=5, value=90, marks={0: "0", 60: "60", 120: "120", 180: "180", 240: "240"}, tooltip={"placement": "bottom", "always_visible": True}),
+                                dcc.Slider(
+                                    id="pure-lag",
+                                    min=0,
+                                    max=240,
+                                    step=5,
+                                    value=90,
+                                    marks={0: "0", 60: "60", 120: "120", 180: "180", 240: "240"},
+                                    tooltip={"placement": "bottom", "always_visible": True},
+                                ),
                                 html.H4("Assumptions", style={"color": FNI_BLUE}),
                                 html.Ul(
                                     style={"paddingLeft": "20px", "marginBottom": 0},
@@ -675,7 +873,9 @@ app.layout = html.Div(
                                         html.Li("Uses one eight-point representative cross section."),
                                         html.Li("Manning conveyance generates stage-discharge behavior."),
                                         html.Li("Reach storage is cross-section area times reach length."),
-                                        html.Li("Routing is simplified for instruction; it is not a detailed HMS replica."),
+                                        html.Li(
+                                            "Routing is simplified for instruction; it is not a detailed HMS replica."
+                                        ),
                                         html.Li("Hydrograph CSV columns: time, inflow."),
                                     ],
                                 ),
@@ -686,7 +886,11 @@ app.layout = html.Div(
                             children=[
                                 html.Div(id="status-message", style=CARD_STYLE),
                                 html.Div(
-                                    style={"display": "grid", "gridTemplateColumns": "repeat(4, minmax(0, 1fr))", "gap": "16px"},
+                                    style={
+                                        "display": "grid",
+                                        "gridTemplateColumns": "repeat(4, minmax(0, 1fr))",
+                                        "gap": "16px",
+                                    },
                                     children=[
                                         html.Div(id="metric-peak", style=METRIC_CARD_STYLE),
                                         html.Div(id="metric-time", style=METRIC_CARD_STYLE),
@@ -709,24 +913,50 @@ app.layout = html.Div(
                                         html.H3("Calibration Summary", style={"marginTop": 0, "color": FNI_BLUE}),
                                         dash_table.DataTable(
                                             id="summary-table",
-                                            columns=[{"name": c, "id": c} for c in ["Metric", "Value", "Time (min)", "Peak Error", "Timing Error (min)"]],
+                                            columns=[
+                                                {"name": c, "id": c}
+                                                for c in [
+                                                    "Metric",
+                                                    "Value",
+                                                    "Time (min)",
+                                                    "Peak Error",
+                                                    "Timing Error (min)",
+                                                ]
+                                            ],
                                             data=[],
                                             style_table={"overflowX": "auto"},
-                                            style_header={"backgroundColor": FNI_BLUE, "color": "white", "fontWeight": "bold"},
-                                            style_cell={"textAlign": "left", "padding": "10px", "border": "1px solid #e3eaee"},
+                                            style_header={
+                                                "backgroundColor": FNI_BLUE,
+                                                "color": "white",
+                                                "fontWeight": "bold",
+                                            },
+                                            style_cell={
+                                                "textAlign": "left",
+                                                "padding": "10px",
+                                                "border": "1px solid #e3eaee",
+                                            },
                                         ),
                                     ],
                                 ),
                                 html.Details(
                                     style=CARD_STYLE,
                                     children=[
-                                        html.Summary("Teaching notes", style={"cursor": "pointer", "fontWeight": "bold", "color": FNI_BLUE}),
+                                        html.Summary(
+                                            "Teaching notes",
+                                            style={"cursor": "pointer", "fontWeight": "bold", "color": FNI_BLUE},
+                                        ),
                                         html.Div(
                                             style={"marginTop": "12px"},
                                             children=[
-                                                html.P("This app is designed to make the representative-cross-section problem visible. A Muskingum-Cunge setup can look precise because it asks for geometry, roughness, length, and slope, but the result can still be governed by whether that one section actually represents the reach."),
-                                                html.P("Suggested workshop prompt: ask participants to hit both target peak flow and target timing, then change only the predefined reach. The difficulty of preserving calibration across reaches is the lesson."),
-                                                html.P("The pure-lag curve is included as a baseline. It shifts timing but does not create physically meaningful attenuation from storage."),
+                                                html.P(
+                                                    "This app is designed to make the representative-cross-section problem visible. A Muskingum-Cunge setup can look precise because it asks for geometry, roughness, length, and slope, but the result can still be governed by whether that one section actually represents the reach."
+                                                ),
+                                                html.P(
+                                                    "Suggested workshop prompt: ask participants to hit both target peak flow and target timing, then change only the predefined reach. The difficulty of preserving calibration across reaches is the lesson."
+                                                ),
+                                                html.P(
+                                                    "The pure-lag curve is included as a baseline. It shifts timing but does not create physically meaningful attenuation from storage."
+                                                ),
                                             ],
                                         ),
                                     ],
@@ -736,7 +966,7 @@ app.layout = html.Div(
                     ],
                 ),
             ],
-        )
+        ),
     ],
 )
 
@@ -745,11 +975,21 @@ app.layout = html.Div(
 # Callbacks
 # -----------------------------
 
+
 @app.callback(Output("hydro-file-name", "children"), Input("upload-hydro", "filename"))
 def show_hydro_filename(filename):
     if not filename:
         return "Using built-in sample hydrograph."
     return f"Selected: {filename}"
+
+
+@app.callback(
+    Output("download-hydro-sample", "data"),
+    Input("btn-download-hydro", "n_clicks"),
+    prevent_initial_call=True,
+)
+def download_hydro_sample(_n_clicks):
+    return dcc.send_data_frame(SAMPLE_HYDRO.to_csv, "sample_hydrograph.csv", index=False)
 
 
 @app.callback(
@@ -820,7 +1060,9 @@ def update_outputs(
 
         summary = summarize_results(result, float(target_peak), float(target_time))
         for col in ["Value", "Time (min)", "Peak Error", "Timing Error (min)"]:
-            summary[col] = summary[col].map(lambda x: round(float(x), 3) if isinstance(x, (int, float, np.floating)) else x)
+            summary[col] = summary[col].map(
+                lambda x: round(float(x), 3) if isinstance(x, (int, float, np.floating)) else x
+            )
 
         routed_peak, routed_peak_time = peak_stats(result.time_min, result.routed_cfs)
         max_stage = float(np.max(result.stage_ft))
@@ -828,18 +1070,30 @@ def update_outputs(
         vol_out = float(np.trapezoid(result.routed_cfs, result.time_min * 60.0) / FT3_PER_ACFT)
         volume_error_pct = 100.0 * (vol_out - vol_in) / max(vol_in, 1e-9)
 
-        status = html.Div([
-            html.H3("Model updated", style={"marginTop": 0, "color": FNI_BLUE}),
-            html.P(base_xs.description),
-            html.P(f"Effective reach length: {base_xs.reach_length_ft * float(length_factor):,.0f} ft. Effective slope: {base_xs.bed_slope_ftft * float(slope_factor):.5f} ft/ft."),
-        ])
+        status = html.Div(
+            [
+                html.H3("Model updated", style={"marginTop": 0, "color": FNI_BLUE}),
+                html.P(base_xs.description),
+                html.P(
+                    f"Effective reach length: {base_xs.reach_length_ft * float(length_factor):,.0f} ft. Effective slope: {base_xs.bed_slope_ftft * float(slope_factor):.5f} ft/ft."
+                ),
+            ]
+        )
 
         return (
             status,
-            metric_card("Routed Peak", f"{routed_peak:,.0f} cfs", f"target error {routed_peak - float(target_peak):+,.0f} cfs"),
-            metric_card("Peak Time", f"{routed_peak_time:,.0f} min", f"target error {routed_peak_time - float(target_time):+,.0f} min"),
+            metric_card(
+                "Routed Peak", f"{routed_peak:,.0f} cfs", f"target error {routed_peak - float(target_peak):+,.0f} cfs"
+            ),
+            metric_card(
+                "Peak Time",
+                f"{routed_peak_time:,.0f} min",
+                f"target error {routed_peak_time - float(target_time):+,.0f} min",
+            ),
             metric_card("Max Stage", f"{max_stage:,.2f} ft", "relative to thalweg"),
-            metric_card("Volume Error", f"{volume_error_pct:+.2f}%", f"out {vol_out:,.1f} ac-ft vs in {vol_in:,.1f} ac-ft"),
+            metric_card(
+                "Volume Error", f"{volume_error_pct:+.2f}%", f"out {vol_out:,.1f} ac-ft vs in {vol_in:,.1f} ac-ft"
+            ),
             make_hydrograph_figure(result, float(target_peak), float(target_time)),
             make_cross_section_figure(xs, result.rating, max_stage),
             make_rating_figure(result.rating),
@@ -848,10 +1102,12 @@ def update_outputs(
         )
 
     except Exception as exc:
-        status = html.Div([
-            html.H3("Routing error", style={"marginTop": 0, "color": FNI_ORANGE}),
-            html.P(str(exc)),
-        ])
+        status = html.Div(
+            [
+                html.H3("Routing error", style={"marginTop": 0, "color": FNI_ORANGE}),
+                html.P(str(exc)),
+            ]
+        )
         return (
             status,
             metric_card("Routed Peak", "--", "Check inputs"),
