@@ -35,3 +35,11 @@ local_data/
 instance/
 .env
 .env.*
+
+# Brainstorming scratch (visual companion mockups)
+.superpowers/
+
+# Preset source data is committed despite the global *.csv ignore above
+!apps/modified_puls_web/data/
+!apps/modified_puls_web/data/*.csv
+.gstack/
