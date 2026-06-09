@@ -10,14 +10,15 @@ import { parseHydrograph, parseStorageDischarge, hydrographToCsv, storageDischar
 import { drawConcept, drawResultHydro, drawCurve, drawMechCurve, resize } from "./charts.js";
 
 const PRESET_BY_ID = Object.fromEntries(PRESETS.map((p) => [p.id, p]));
+const CUSTOM_ID = "custom";
 
 const state = {
   presetId: DEFAULT_PRESET_ID,
   multiplier: 1.0,
   act: 1,
   step: 0,
-  uploadedHydro: null,
-  uploadedCurve: null,
+  // Uploaded data lives in its own dropdown entry instead of overwriting a preset.
+  custom: null, // { hydro, curve, hydroName, curveName, baseLabel }
 };
 
 let computed = null; // { result, steps, hydro, curve, error }
@@ -27,11 +28,18 @@ const fmt = (x, d = 2) => (Number.isFinite(x) ? x.toLocaleString("en-US", { mini
 const fmt0 = (x) => fmt(x, 0);
 
 // ---------- data resolution ----------
+function activeData() {
+  if (state.presetId === CUSTOM_ID && state.custom) return state.custom;
+  return PRESET_BY_ID[state.presetId] || PRESET_BY_ID[DEFAULT_PRESET_ID];
+}
 function currentHydro() {
-  return state.uploadedHydro || PRESET_BY_ID[state.presetId].hydro;
+  return activeData().hydro;
 }
 function currentCurve() {
-  return state.uploadedCurve || PRESET_BY_ID[state.presetId].curve;
+  return activeData().curve;
+}
+function isCustom() {
+  return state.presetId === CUSTOM_ID && !!state.custom;
 }
 
 function recompute() {
@@ -62,8 +70,7 @@ function renderStatus() {
   }
   el.classList.remove("error");
   const dt = computed.hydro.timeMin[1] - computed.hydro.timeMin[0];
-  const usingUpload = state.uploadedHydro || state.uploadedCurve;
-  const src = usingUpload ? "uploaded data" : `preset: ${PRESET_BY_ID[state.presetId].label}`;
+  const src = isCustom() ? "your uploaded data" : `preset: ${activeData().label}`;
   el.innerHTML = `<h2>Ready</h2><p>Routing ${src}. Detected time step Δt = ${dt} min, storage multiplier ${state.multiplier.toFixed(2)}.</p>`;
   $("dt-readout").textContent = `${dt} min`;
 }
@@ -80,7 +87,6 @@ function renderConcept() {
 function renderMechanics() {
   const { steps } = computed;
   const k = state.step;
-  // tableau
   let html = "<thead><tr><th>t (min)</th><th>I₁+I₂</th><th>2S/Δt+O</th><th>O (cfs)</th><th>S (ac-ft)</th></tr></thead><tbody>";
   steps.rows.forEach((r, i) => {
     const cls = (i === k ? "active" : "") + (r.clamped ? " clamped" : "");
@@ -92,7 +98,6 @@ function renderMechanics() {
   const activeRow = $("mech-table").querySelector("tr.active");
   if (activeRow) activeRow.scrollIntoView({ block: "nearest" });
 
-  // equation
   const r = steps.rows[k];
   if (k === 0) {
     $("mech-eqn").innerHTML = `<b>Initial condition</b> at t = ${fmt0(r.tMin)} min: O = <b>${fmt(r.outflowCfs, 2)} cfs</b>, S = <b>${fmt(r.storageAcft, 2)} ac-ft</b>.`;
@@ -104,7 +109,9 @@ function renderMechanics() {
   }
 
   drawMechCurve("mech-curve", steps, k);
-  $("step-counter").textContent = `Step ${k} of ${steps.rows.length - 1}`;
+  let counter = `Step ${k} of ${steps.rows.length - 1} · t = ${fmt0(r.tMin)} min`;
+  if (steps.sampled) counter += ` · representative steps from ${steps.totalSteps} timesteps`;
+  $("step-counter").textContent = counter;
   resize("mech-curve");
 }
 
@@ -173,13 +180,42 @@ function writeHash() {
 function readHash() {
   const h = new URLSearchParams(location.hash.slice(1));
   const preset = h.get("preset");
-  if (preset && PRESET_BY_ID[preset]) state.presetId = preset;
+  if (preset && PRESET_BY_ID[preset]) state.presetId = preset; // custom can't be restored from a link
   const mult = parseFloat(h.get("mult"));
   if (Number.isFinite(mult) && mult >= 0.5 && mult <= 3.0) state.multiplier = mult;
   const act = parseInt(h.get("act"), 10);
   if (act >= 1 && act <= 3) state.act = act;
   const step = parseInt(h.get("step"), 10);
   if (Number.isFinite(step) && step >= 0) state.step = step;
+}
+
+// ---------- rail helpers ----------
+function rebuildPresetOptions() {
+  const sel = $("preset-select");
+  const opts = PRESETS.map((p) => `<option value="${p.id}">${p.label}</option>`);
+  if (state.custom) opts.push(`<option value="${CUSTOM_ID}">★ Your uploaded data</option>`);
+  sel.innerHTML = opts.join("");
+  sel.value = state.presetId;
+}
+
+function updateRailText() {
+  if (isCustom()) {
+    $("preset-blurb").textContent =
+      "Your uploaded data. Upload a hydrograph and/or a storage-discharge CSV; whichever you don't upload keeps the example you started from.";
+    $("hydro-name").textContent = state.custom.hydroName ? `Hydrograph: ${state.custom.hydroName}` : `Hydrograph: from “${state.custom.baseLabel}”`;
+    $("curve-name").textContent = state.custom.curveName ? `Curve: ${state.custom.curveName}` : `Curve: from “${state.custom.baseLabel}”`;
+  } else {
+    $("preset-blurb").textContent = activeData().blurb;
+    $("hydro-name").textContent = "Using preset hydrograph.";
+    $("curve-name").textContent = "Using preset storage-discharge curve.";
+  }
+}
+
+function ensureCustom() {
+  if (!state.custom) {
+    const base = PRESET_BY_ID[state.presetId] || PRESET_BY_ID[DEFAULT_PRESET_ID];
+    state.custom = { hydro: base.hydro, curve: base.curve, hydroName: null, curveName: null, baseLabel: base.label };
+  }
 }
 
 // ---------- events ----------
@@ -190,20 +226,15 @@ function refresh() {
 }
 
 function initRail() {
-  const sel = $("preset-select");
-  sel.innerHTML = PRESETS.map((p) => `<option value="${p.id}">${p.label}</option>`).join("");
-  sel.value = state.presetId;
-  $("preset-blurb").textContent = PRESET_BY_ID[state.presetId].blurb;
+  rebuildPresetOptions();
+  updateRailText();
   $("mult-slider").value = state.multiplier;
   $("mult-out").textContent = state.multiplier.toFixed(2);
 
-  sel.addEventListener("change", () => {
-    state.presetId = sel.value;
-    state.uploadedHydro = state.uploadedCurve = null;
-    $("hydro-name").textContent = "Using preset hydrograph.";
-    $("curve-name").textContent = "Using preset storage-discharge curve.";
-    $("preset-blurb").textContent = PRESET_BY_ID[state.presetId].blurb;
+  $("preset-select").addEventListener("change", (e) => {
+    state.presetId = e.target.value;
     state.step = 0;
+    updateRailText();
     refresh();
   });
 
@@ -215,19 +246,21 @@ function initRail() {
 
   $("upload-hydro").addEventListener("change", (e) => handleUpload(e, true));
   $("upload-curve").addEventListener("change", (e) => handleUpload(e, false));
+
   $("reset-data").addEventListener("click", () => {
-    state.uploadedHydro = state.uploadedCurve = null;
-    $("hydro-name").textContent = "Using preset hydrograph.";
-    $("curve-name").textContent = "Using preset storage-discharge curve.";
+    state.custom = null;
+    state.presetId = DEFAULT_PRESET_ID;
     state.step = 0;
+    rebuildPresetOptions();
+    updateRailText();
     refresh();
   });
 
   $("share-btn").addEventListener("click", () => {
     writeHash();
     navigator.clipboard.writeText(location.href).then(() => {
-      const note = state.uploadedHydro || state.uploadedCurve
-        ? "Link copied — note: it uses the selected preset, not your uploaded file."
+      const note = isCustom()
+        ? "Link copied — note: uploaded data isn't included in the link (it stays on this device)."
         : "Link copied to clipboard.";
       $("share-status").textContent = note;
       setTimeout(() => ($("share-status").textContent = ""), 4000);
@@ -244,17 +277,19 @@ function handleUpload(e, isHydro) {
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      if (isHydro) {
-        state.uploadedHydro = parseHydrograph(reader.result);
-        $("hydro-name").textContent = `Loaded: ${file.name}`;
-      } else {
-        state.uploadedCurve = parseStorageDischarge(reader.result);
-        $("curve-name").textContent = `Loaded: ${file.name}`;
-      }
+      const parsed = isHydro ? parseHydrograph(reader.result) : parseStorageDischarge(reader.result);
+      ensureCustom();
+      if (isHydro) { state.custom.hydro = parsed; state.custom.hydroName = file.name; }
+      else { state.custom.curve = parsed; state.custom.curveName = file.name; }
+      state.presetId = CUSTOM_ID;
       state.step = 0;
+      rebuildPresetOptions();
+      updateRailText();
       refresh();
     } catch (err) {
       (isHydro ? $("hydro-name") : $("curve-name")).textContent = `Error: ${err.message}`;
+    } finally {
+      e.target.value = ""; // allow re-uploading the same filename
     }
   };
   reader.readAsText(file);
@@ -296,7 +331,7 @@ function togglePlay() {
     const max = computed.steps.rows.length - 1;
     if (state.step >= max) return stopPlay();
     stepNext();
-  }, 350);
+  }, 450);
 }
 function stopPlay() {
   if (playTimer) { clearInterval(playTimer); playTimer = null; }
