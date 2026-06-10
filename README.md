@@ -12,6 +12,38 @@ The apps are intentionally lightweight Dash prototypes. Each app teaches one con
 | Alternatives Analysis Explorer | Compares stormwater alternatives by problem type, benefit, cost, and practicality. | `python apps/alternatives_analysis/app.py` |
 | TC and Lag Assumption Explorer | Shows how lag assumptions affect runoff hydrograph shape and timing. | `python apps/tc_lag/app.py` |
 | Routing Reach Representation Trainer | Shows sensitivity of Muskingum-Cunge-style routing to representative reach geometry. | `python apps/muskingum_cunge/app.py` |
+| Modified Puls Teaching Companion (web) | Static, browser-only version for GitHub Pages: a guided concept → mechanics → result walkthrough of storage-indication routing. | `python -m http.server 8060 -d apps/modified_puls_web` |
+
+## Web teaching companion (GitHub Pages)
+
+`apps/modified_puls_web/` is a static, client-side version of the Modified Puls tool built to run
+entirely in the browser and deploy to **GitHub Pages** — no Python server. It teaches storage-indication
+routing as a guided **concept → mechanics → result** walkthrough and is meant for students to follow on
+their own laptops during a presentation. It shares the Python core's math: `apps/modified_puls/app.py`
+is the reference implementation, and a Node parity test asserts the JS output against golden values
+exported from it.
+
+Run locally (static, no build step):
+
+```bash
+python -m http.server 8060 -d apps/modified_puls_web
+# open http://127.0.0.1:8060/
+```
+
+Test JS↔Python parity:
+
+```bash
+python scripts/export_golden.py                          # needs NumPy >= 2.0
+node --test apps/modified_puls_web/test/routing.test.mjs
+```
+
+Publish to GitHub Pages, then enable Pages on the `/docs` folder:
+
+```bash
+python scripts/build_docs.py     # copies the app into /docs (Settings → Pages → Deploy from a branch → /docs)
+```
+
+See `apps/modified_puls_web/README.md` for the full file map and deploy notes.
 
 ## Repository goals
 
@@ -92,10 +124,9 @@ Use `np.trapezoid(...)` for trapezoidal integration. NumPy 2.x removed `np.trapz
 
 ## Documentation
 
-- `docs/architecture.md` describes the preferred layered app architecture.
-- `docs/style_guide.md` records visual and UX standards.
-- `docs/app_template.md` gives a checklist for adding a new teaching app.
-- `templates/new_app_template.py` provides a starting point for future apps.
+- `specs/` holds design specs for larger features (e.g. `specs/2026-06-08-modified-puls-teaching-companion-design.md`).
+- `docs/` is the published **GitHub Pages** site — it serves the static Modified Puls Teaching Companion, built from `apps/modified_puls_web/` by `python scripts/build_docs.py`. Do not hand-edit `docs/`; edit the source and re-run the build.
+- Each app keeps its own `readme.md` with its learning objective, inputs, assumptions, and outputs.
 
 ## Status
 

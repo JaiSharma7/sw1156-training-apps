@@ -1,0 +1,10 @@
+{
+  "name": "modified-puls-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Static, client-side Modified Puls teaching companion (GitHub Pages).",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

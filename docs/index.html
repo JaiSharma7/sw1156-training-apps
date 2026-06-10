@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Modified Puls Routing — Teaching Companion</title>
+  <link rel="stylesheet" href="css/styles.css?v=14195630" />
+  <script src="vendor/plotly.min.js?v=14195630"></script>
+</head>
+<body>
+  <header class="appbar">
+    <h1>Modified Puls Routing <span>Teaching Companion</span></h1>
+    <nav class="tabs" id="tabs">
+      <button class="tab" data-act="1"><b>1</b> Concept</button>
+      <button class="tab" data-act="2"><b>2</b> Mechanics</button>
+      <button class="tab" data-act="3"><b>3</b> Result</button>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <!-- Left input rail (persists across acts) -->
+    <aside class="rail card">
+      <h3>Example</h3>
+      <select id="preset-select" aria-label="Preset example"></select>
+      <p id="preset-blurb" class="muted small"></p>
+
+      <h3>Storage multiplier</h3>
+      <div class="slider-row">
+        <input type="range" id="mult-slider" min="0.1" max="3" step="0.05" value="1" />
+        <output id="mult-out">1.00</output>
+      </div>
+      <p class="muted small">Scales storage only. Higher = more storage held back.</p>
+
+      <h3>Use your own data</h3>
+      <label class="upload">
+        <input type="file" id="upload-hydro" accept=".csv" hidden />
+        <span>Upload hydrograph CSV</span>
+      </label>
+      <div id="hydro-name" class="muted small">Using preset hydrograph.</div>
+      <label class="upload">
+        <input type="file" id="upload-curve" accept=".csv" hidden />
+        <span>Upload storage-discharge CSV</span>
+      </label>
+      <div id="curve-name" class="muted small">Using preset storage-discharge curve.</div>
+      <button id="reset-data" class="btn-ghost small">Reset to preset data</button>
+
+      <div class="rail-foot">
+        <div class="dt-readout">Δt: <b id="dt-readout">—</b></div>
+        <button id="share-btn" class="btn-primary">🔗 Share this view</button>
+        <div id="share-status" class="muted small"></div>
+        <div class="downloads small">
+          <a href="#" id="dl-hydro">⬇ hydrograph CSV</a> ·
+          <a href="#" id="dl-curve">⬇ curve CSV</a>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main panel: three acts -->
+    <section class="main">
+      <div id="status" class="card status"></div>
+
+      <!-- ACT 1: CONCEPT -->
+      <div class="act" id="act-1">
+        <div class="card">
+          <h2>What routing does</h2>
+          <p class="lead">A reservoir or basin holds water back and lets it out through its outlet.
+            The result is a routed <b>outflow</b> hydrograph that is <b>attenuated</b> (lower peak) and
+            <b>lagged</b> (later peak) compared to the inflow. Drag the storage multiplier and watch both change.</p>
+          <div class="plot" id="concept-plot"></div>
+          <div class="concept-metrics">
+            <div class="pill"><span class="muted">Peak attenuation</span><b id="concept-atten">—</b></div>
+            <div class="pill"><span class="muted">Peak lag</span><b id="concept-lag">—</b></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACT 2: MECHANICS -->
+      <div class="act" id="act-2" hidden>
+        <div class="card">
+          <h2>The arithmetic HEC-HMS hides</h2>
+          <p class="lead">Each timestep solves one equation against the <b>storage-indication curve</b>.
+            Step through it: the green marker is exactly where this step's value is read off the curve.</p>
+          <div class="split">
+            <div class="tableau-wrap">
+              <table class="tableau" id="mech-table"></table>
+            </div>
+            <div class="plot mech-plot" id="mech-curve"></div>
+          </div>
+          <div class="eqn" id="mech-eqn"></div>
+          <div class="stepper">
+            <button id="step-prev" class="btn-ghost">◀ Prev</button>
+            <button id="step-next" class="btn-ghost">Next ▶</button>
+            <button id="step-play" class="btn-ghost">▶▶ Auto-play</button>
+            <span id="step-counter" class="muted"></span>
+          </div>
+          <p class="note">☞ The curve <b>is</b> the routing. HEC-HMS just runs this loop for every timestep. On long events the stepper shows representative steps (first, peak, last, and evenly-spaced points) — each row is still an exact routed timestep.</p>
+        </div>
+      </div>
+
+      <!-- ACT 3: RESULT -->
+      <div class="act" id="act-3" hidden>
+        <div class="metrics">
+          <div class="metric card" id="m-inflow"></div>
+          <div class="metric card" id="m-outflow"></div>
+          <div class="metric card" id="m-modified"></div>
+          <div class="metric card" id="m-volume"></div>
+        </div>
+        <div class="two-col">
+          <div class="card"><div class="plot" id="result-hydro"></div></div>
+          <div class="card"><div class="plot" id="result-curve"></div></div>
+        </div>
+        <div class="card">
+          <h3>Hydrograph summary</h3>
+          <table class="summary" id="result-table"></table>
+        </div>
+        <div class="card note-card" id="result-notes"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/app.js?v=14195630"></script>
+</body>
+</html>
