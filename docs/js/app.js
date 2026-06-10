@@ -1,13 +1,13 @@
 // Modified Puls Teaching Companion — app orchestration.
 // Owns state, wires the left rail + tabs + stepper, computes routing, and keeps the URL hash in sync.
 
-import { PRESETS, DEFAULT_PRESET_ID } from "./presets.js?v=14195630";
+import { PRESETS, DEFAULT_PRESET_ID } from "./presets.js?v=2d2c347a";
 import {
   routeBothCases, peakStats, attenuationAndLag, continuitySummary, firstClampTime,
-} from "./routing.js?v=14195630";
-import { buildSteps } from "./steps.js?v=14195630";
-import { parseHydrograph, parseStorageDischarge, hydrographToCsv, storageDischargeToCsv } from "./csv.js?v=14195630";
-import { drawConcept, drawResultHydro, drawCurve, drawMechCurve, resize } from "./charts.js?v=14195630";
+} from "./routing.js?v=2d2c347a";
+import { buildSteps } from "./steps.js?v=2d2c347a";
+import { parseHydrograph, parseStorageDischarge, hydrographToCsv, storageDischargeToCsv } from "./csv.js?v=2d2c347a";
+import { drawConcept, drawResultHydro, drawCurve, drawMechCurve, resize } from "./charts.js?v=2d2c347a";
 
 const PRESET_BY_ID = Object.fromEntries(PRESETS.map((p) => [p.id, p]));
 const CUSTOM_ID = "custom";
