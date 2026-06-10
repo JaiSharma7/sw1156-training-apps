@@ -182,7 +182,7 @@ function readHash() {
   const preset = h.get("preset");
   if (preset && PRESET_BY_ID[preset]) state.presetId = preset; // custom can't be restored from a link
   const mult = parseFloat(h.get("mult"));
-  if (Number.isFinite(mult) && mult >= 0.5 && mult <= 3.0) state.multiplier = mult;
+  if (Number.isFinite(mult) && mult >= 0.1 && mult <= 3.0) state.multiplier = mult;
   const act = parseInt(h.get("act"), 10);
   if (act >= 1 && act <= 3) state.act = act;
   const step = parseInt(h.get("step"), 10);

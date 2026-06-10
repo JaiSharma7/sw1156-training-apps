@@ -1,13 +1,13 @@
 // Modified Puls Teaching Companion — app orchestration.
 // Owns state, wires the left rail + tabs + stepper, computes routing, and keeps the URL hash in sync.
 
-import { PRESETS, DEFAULT_PRESET_ID } from "./presets.js?v=866cd5ed";
+import { PRESETS, DEFAULT_PRESET_ID } from "./presets.js?v=14195630";
 import {
   routeBothCases, peakStats, attenuationAndLag, continuitySummary, firstClampTime,
-} from "./routing.js?v=866cd5ed";
-import { buildSteps } from "./steps.js?v=866cd5ed";
-import { parseHydrograph, parseStorageDischarge, hydrographToCsv, storageDischargeToCsv } from "./csv.js?v=866cd5ed";
-import { drawConcept, drawResultHydro, drawCurve, drawMechCurve, resize } from "./charts.js?v=866cd5ed";
+} from "./routing.js?v=14195630";
+import { buildSteps } from "./steps.js?v=14195630";
+import { parseHydrograph, parseStorageDischarge, hydrographToCsv, storageDischargeToCsv } from "./csv.js?v=14195630";
+import { drawConcept, drawResultHydro, drawCurve, drawMechCurve, resize } from "./charts.js?v=14195630";
 
 const PRESET_BY_ID = Object.fromEntries(PRESETS.map((p) => [p.id, p]));
 const CUSTOM_ID = "custom";
@@ -182,7 +182,7 @@ function readHash() {
   const preset = h.get("preset");
   if (preset && PRESET_BY_ID[preset]) state.presetId = preset; // custom can't be restored from a link
   const mult = parseFloat(h.get("mult"));
-  if (Number.isFinite(mult) && mult >= 0.5 && mult <= 3.0) state.multiplier = mult;
+  if (Number.isFinite(mult) && mult >= 0.1 && mult <= 3.0) state.multiplier = mult;
   const act = parseInt(h.get("act"), 10);
   if (act >= 1 && act <= 3) state.act = act;
   const step = parseInt(h.get("step"), 10);
